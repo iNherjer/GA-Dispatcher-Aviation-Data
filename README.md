@@ -69,11 +69,16 @@ automatisch in nummerierte Teilpacks zerlegt.
 `publish.yml` unterstützt:
 
 - einen manuellen Initiallauf über **Run workflow**,
-- einen wöchentlichen Scheduler mit einer 27-Tage-Sperre,
+- einen täglichen Scheduler mit einer 27-Tage-Sperre,
 - einen erzwungenen Neuaufbau,
 - einen optionalen Länder-Testlauf,
 - Validierung vor dem atomaren Pages-Deployment,
 - einen kleinen Status-Commit nach erfolgreichem Deployment.
+
+Die tägliche Prüfung lädt nicht täglich OpenAIP. Solange der letzte erfolgreiche
+Stand jünger als 27 Tage ist, endet sie sofort. Ist ein Update fällig und der
+Upstream fällt aus, bleibt der bisherige Pages-Stand online und der nächste
+tägliche Lauf versucht den vollständigen Build erneut.
 
 Für den ersten Lauf muss GitHub Pages einmal im Repository unter
 **Settings → Pages → Source: GitHub Actions** aktiviert sein. Danach erzeugt
