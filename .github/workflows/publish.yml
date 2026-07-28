@@ -1,0 +1,145 @@
+name: Build and publish aviation data
+
+on:
+  workflow_dispatch:
+    inputs:
+      countries:
+        description: "Optional comma-separated test scope, e.g. DE,AT,CH. Empty builds global data."
+        required: false
+        type: string
+        default: ""
+      collections:
+        description: "Optional comma-separated collections. Empty builds all four."
+        required: false
+        type: string
+        default: ""
+      force:
+        description: "Ignore the 27-day build gate"
+        required: true
+        type: boolean
+        default: true
+  schedule:
+    - cron: "37 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aviation-data-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    outputs:
+      should_build: ${{ steps.gate.outputs.should_build }}
+      reason: ${{ steps.gate.outputs.reason }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Decide whether a new snapshot is due
+        id: gate
+        shell: bash
+        env:
+          FORCE_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.force || 'false' }}
+        run: node tools/should-build.mjs --state=state/latest-build.json --max-age-days=27 --force="$FORCE_BUILD" >> "$GITHUB_OUTPUT"
+
+      - name: Run unit tests
+        if: steps.gate.outputs.should_build == 'true'
+        run: npm test
+
+      - name: Build dataset
+        if: steps.gate.outputs.should_build == 'true'
+        env:
+          COUNTRIES: ${{ github.event_name == 'workflow_dispatch' && inputs.countries || '' }}
+          COLLECTIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.collections || '' }}
+        run: node tools/build-data.mjs --output=dist
+
+      - name: Validate dataset
+        if: steps.gate.outputs.should_build == 'true'
+        run: node tools/validate-data.mjs dist
+
+      - name: Configure GitHub Pages
+        if: steps.gate.outputs.should_build == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        if: steps.gate.outputs.should_build == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+          retention-days: 14
+
+      - name: Upload build state
+        if: steps.gate.outputs.should_build == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: aviation-data-build-state
+          path: dist/build-state.json
+          retention-days: 14
+
+      - name: Explain skipped run
+        if: steps.gate.outputs.should_build != 'true'
+        run: echo "No build required (${{ steps.gate.outputs.reason }})."
+
+  deploy:
+    if: needs.build.outputs.should_build == 'true'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  record:
+    if: needs.build.outputs.should_build == 'true' && needs.deploy.result == 'success'
+    needs:
+      - build
+      - deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Download build state
+        uses: actions/download-artifact@v5
+        with:
+          name: aviation-data-build-state
+          path: .build-state
+
+      - name: Record successful build
+        run: node tools/update-state.mjs --source=.build-state/build-state.json --target=state/latest-build.json
+
+      - name: Commit scheduler state
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/latest-build.json
+          git diff --cached --quiet || git commit -m "Record aviation data snapshot"
+          git push
