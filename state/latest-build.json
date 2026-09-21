@@ -1,25 +1,25 @@
 {
   "schemaVersion": 1,
-  "lastSuccessfulBuild": "2026-08-25T06:43:47.976Z",
-  "datasetVersion": "snapshot-2026-08-25",
-  "manifestSha256": "0f06eacb20f8c1bd9056ec8ca5f1284ff5bf78238be66b77272986fc00e98bbc",
+  "lastSuccessfulBuild": "2026-09-21T09:15:31.975Z",
+  "datasetVersion": "snapshot-2026-09-21",
+  "manifestSha256": "a327f074de7b2a145e32a29e67d1f1175a01971c3e3376fad694a3a2993f2085",
   "scope": {
     "type": "global"
   },
   "collections": {
     "airspaces": {
-      "sourceCount": 31613,
-      "count": 31613,
-      "packCount": 902
+      "sourceCount": 31860,
+      "count": 31860,
+      "packCount": 907
     },
     "airports": {
-      "sourceCount": 46726,
-      "count": 46726,
+      "sourceCount": 46764,
+      "count": 46764,
       "packCount": 1473
     },
     "navaids": {
-      "sourceCount": 5105,
-      "count": 5105,
+      "sourceCount": 5113,
+      "count": 5113,
       "packCount": 870
     },
     "reportingPoints": {
